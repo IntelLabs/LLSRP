@@ -19,12 +19,23 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
 #include "GrabWindow.h"
 
 #define abs(x) ((x) < 0 ? (-(x)) : (x))
+
+GrabWindow::GrabWindow(GrabWindow &GW) {
+  printf("Copy is not allowed for GrabWindow class, exiting\n");
+  exit(1);
+}
+
+GrabWindow &GrabWindow::operator =(GrabWindow &GW) {
+  printf("operator = is not allowed for GrabWindow class, exiting\n");
+  exit(1);
+}
 
 XImage *allocateImage(Display *Display, int32_t Width, int32_t Height,
                       XShmSegmentInfo &ShmInfo, uint32_t *Data) {

@@ -18,9 +18,9 @@
  *             e-mail: evgeny.v.stupachenko@intel.com
  */
 
-#include <stdint.h>
-#include <sys/time.h>
-#include "VideoDecode.h"
+#include <windows.h>
+#include <sysinfoapi.h>
+#include "VideoDecodeW.h"
 #include "Config.h"
 
 VideoDecode::VideoDecode() {
@@ -45,21 +45,18 @@ VideoDecode::~VideoDecode() {
 }
 
 int32_t VideoDecode::init(int32_t SliceNum) {
-#ifdef HWD_ACCEL
+
   Codec = avcodec_find_decoder_by_name("h264_qsv");
   if (!Codec) {
 #ifdef PRINT_WARN
     printf("Hardware accel not found! Decode could be slow!\n");
-#endif
 #endif
     Codec = avcodec_find_decoder(AV_CODEC_ID_H264);
     if (!Codec) {
       printf("Screen codec not found!\n");
       return -1; // Screen Codec not found
     }
-#ifdef HWD_ACCEL
   }
-#endif
 
   CodecCtx = avcodec_alloc_context3(Codec);
   if (!CodecCtx) {
@@ -68,7 +65,7 @@ int32_t VideoDecode::init(int32_t SliceNum) {
 
   CodecCtx->thread_count = 1;
 //  CodecCtx->delay = 0;
-  CodecCtx->flags |= AV_CODEC_FLAG_LOW_DELAY;
+//  CodecCtx->flags |= AV_CODEC_FLAG_LOW_DELAY;
   if (avcodec_open2(CodecCtx, Codec, NULL) < 0) {
     return -3; // Could not open screen codec
   }
@@ -121,18 +118,31 @@ void YUV444toBGRA (uint8_t *InY, uint8_t *InU, uint8_t *InV, uint8_t *Out,
   }
 }
 
+static uint64_t getTime() {
+#ifdef _WIN32
+  uint64_t Time = 0;
+  QueryInterruptTimePrecise(&Time);
+  return Time;
+//
+//  return GetTickCount64() * 1000;
+#else
+  struct timeval t0;
+  gettimeofday(&t0, NULL);
+  return t0.tv_sec * 1000000 + t0.tv_usec;
+#endif
+}
+
 // Decode one frame from Screen Stream  Write result to OutputFrame.
 int32_t VideoDecode::decodeFrame(uint8_t *OutputData, int32_t PktSize,
                                  uint8_t *PktData, int32_t Num, bool WriteData) {
-  struct timeval Start;
-  struct timeval Stop;
-  gettimeofday(&Start, NULL);
+  uint64_t Start;
+  uint64_t Stop;
+  Start = getTime();
   AVPacket Pkt;
   int32_t RetDec, HasFrame = 0;
   av_init_packet(&Pkt);
   Pkt.size = PktSize;
   Pkt.data = PktData;
-  CodecCtx->flags |= AV_CODEC_FLAG_OUTPUT_CORRUPT;
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 37, 100)
   RetDec = avcodec_send_packet(CodecCtx, &Pkt);
   HasFrame = avcodec_receive_frame(CodecCtx, Frame);
@@ -163,8 +173,8 @@ int32_t VideoDecode::decodeFrame(uint8_t *OutputData, int32_t PktSize,
     YUV444toBGRA(Frame->data[0], Frame->data[1], Frame->data[2], OutputData, Frame->width, Frame->height, Num);
   }
   av_packet_unref(&Pkt);
-  gettimeofday(&Stop, NULL);
-  DecodeTime += (Stop.tv_sec - Start.tv_sec) * 1000000 + Stop.tv_usec - Start.tv_usec;
+  Stop = getTime();
+  DecodeTime += (Stop - Start);
   DecodeFrame++;
   return 0;
 }

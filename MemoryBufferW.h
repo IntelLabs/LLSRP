@@ -33,7 +33,7 @@ private:
   int32_t Length;
   int16_t SlicePtrs[SLICE_NUM * SLICE_BUF];
   SliceInfo *SInfo;
-  pthread_mutex_t Mutex;
+  HANDLE Mutex;
   uint32_t WritePtr;
   MemoryBuffer(MemoryBuffer &MB) {
     printf("Copy is not allowed for MemoryBuffer class, exiting\n");
@@ -46,7 +46,7 @@ private:
 public:
   MemoryBuffer(int32_t Size) {
     Length = Size;
-    Mutex = PTHREAD_MUTEX_INITIALIZER;
+    Mutex = CreateMutex(NULL, false, NULL);
     SliceData = new uint8_t[MAX_SIZE * Length];
     SInfo = new SliceInfo[Length];
     WritePtr = 0;
@@ -107,7 +107,7 @@ public:
     return NULL;
   }
   void writeSlice(int32_t SliceNum, int32_t FrameNum, uint16_t Size, int16_t Ptr) {
-    pthread_mutex_lock(&Mutex);
+    WaitForSingleObject(Mutex, INFINITE);
     SInfo[Ptr].SliceNum = SliceNum;
     SInfo[Ptr].FrameNum = FrameNum;
     SInfo[Ptr].Size = Size;
@@ -115,7 +115,7 @@ public:
     for (i = 0; i < SLICE_BUF; i++) {
       if (SlicePtrs[SliceNum * SLICE_BUF + i] == -1) {
         SlicePtrs[SliceNum * SLICE_BUF + i] = Ptr;
-        pthread_mutex_unlock(&Mutex);
+        ReleaseMutex(Mutex);
         return;
       }
     }
@@ -123,7 +123,7 @@ public:
       SlicePtrs[SliceNum * SLICE_BUF + SLICE_BUF - i] = SlicePtrs[SliceNum * SLICE_BUF + SLICE_BUF - i - 1];
     }
     SlicePtrs[SliceNum * SLICE_BUF] = Ptr;
-    pthread_mutex_unlock(&Mutex);
+    ReleaseMutex(Mutex);
     return;
   }
   void printStatus() {

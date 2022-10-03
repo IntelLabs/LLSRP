@@ -22,7 +22,7 @@
 
 GCC = g++
 COMMON_CPP = LLMLNCL/multilink.cpp
-COMMON_DEP = ${COMMON_CPP} LLMLNCL/multilink.h Config.h Options.h Makefile
+COMMON_DEP = ${COMMON_CPP} LLMLNCL/multilink.h Config.h Options.h Makefile TimeStat.h
 FFMPEG_LIB = -lavcodec -lavutil
 SERVER_LIB = -lx264 -lXtst
 VIDEO_CLIENT_CPP = ${COMMON_CPP} Client.cpp VideoDecode.cpp DisplayWindow.cpp MouseKbdRead.cpp

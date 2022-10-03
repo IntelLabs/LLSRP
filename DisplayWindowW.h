@@ -18,38 +18,47 @@
  *             e-mail: evgeny.v.stupachenko@intel.com
  */
 
-#ifndef GRABWINDOW_H
-#define GRABWINDOW_H
+#ifndef DISPLAYWINDOW_H
+#define DISPLAYWINDOW_H
+
+#define GAME_MODE 1
 
 #include <stdint.h>
-#include <sys/shm.h>
-#include <X11/extensions/XShm.h>
+#include <windows.h>
+#include <SDL.h>
 
-class GrabWindow {
+class DisplayWindow {
 private:
   int32_t BufWidth;
   int32_t BufHeight;
-  XShmSegmentInfo ShmInfo;
-  Display *IOScreen;
-  Display *Screen;
-  XImage *Image;
-  uint32_t *Data;
-  GrabWindow(GrabWindow &GW);
-  GrabWindow &operator=(GrabWindow &GW);
+  HANDLE DisplayThread;
+  int32_t *BufData;
+  int32_t Flags;
+  int32_t DrawWinOpened;
+  int32_t Running;
+  SDL_Window *DrawWin;
+  DisplayWindow(DisplayWindow &DW);
+  DisplayWindow &operator=(const DisplayWindow &DW);
 public:
-  GrabWindow();
-  ~GrabWindow();
-  bool grabWindowInit(int32_t Width, int32_t Height, char *DispName);
+  DisplayWindow();
+  ~DisplayWindow();
+  bool isWindowOpened();
+  void setWindowOpened();
+  bool isRunning();
+  bool checkFlags(int32_t Flag);
+  void startRunning();
+  void stopRunning();
+  SDL_Window *getDrawWin();
+  void setDrawWin(SDL_Window *Win);
+  bool createWindow(int32_t Width, int32_t Height, int32_t Flags);
+  void clearImage();
   void drawCursor(int32_t X, int32_t Y, int32_t Color);
   void drawLine(int32_t X0, int32_t Y0, int32_t X1, int32_t Y1, int32_t Color);
-  void drawCursor(int32_t X, int32_t Y, int32_t Color, int32_t Idx);
-  void drawLine(int32_t X0, int32_t Y0, int32_t X1, int32_t Y1, int32_t Color, int32_t Idx);
+  uint8_t *getSlicePtr(int32_t Slice);
   int32_t getWidth();
   int32_t getHeight();
-  XImage *getImage();
-  uint32_t *getData();
-  Display *getDisplay();
-  Display *getIODisplay();
+  int32_t *getDataPtr();
+  void setDataPtr(void *Ptr);
 };
 
-#endif /* GRABWINDOW_H */
+#endif /* DISPLAYWINDOWX_H */

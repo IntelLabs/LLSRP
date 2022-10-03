@@ -31,13 +31,23 @@ private:
   int32_t BufHeight;
   int32_t *BufData;
   pthread_t DisplayThread;
-public:
   int32_t Flags;
   Window DrawWin;
   int32_t DrawWinOpened;
   int32_t Running;
+  DisplayWindow(DisplayWindow &DW);
+  DisplayWindow &operator=(const DisplayWindow &DW);
+public:
   DisplayWindow();
   ~DisplayWindow();
+  bool isWindowOpened();
+  void setWindowOpened();
+  bool isRunning();
+  bool checkFlags(int32_t Flag);
+  void startRunning();
+  void stopRunning();
+  Window &getDrawWin();
+  void setDrawWin(Window &DrawWindow);
   bool createWindow(int32_t Width, int32_t Height, int32_t Flags);
   void clearImage();
   void drawCursor(int32_t X, int32_t Y, int32_t Color);
@@ -45,7 +55,7 @@ public:
   uint8_t *getSlicePtr(int32_t Slice);
   int32_t getWidth();
   int32_t getHeight();
-  void *getDataPtr();
+  int32_t *getDataPtr();
   void setDataPtr(void *Ptr);
 };
 

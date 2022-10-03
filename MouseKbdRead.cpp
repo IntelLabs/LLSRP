@@ -45,7 +45,7 @@ void *readVirtualMouseKbd(void *Ptr) {
   int8_t Data[7 + 8]; // array for recieved data
   DisplayWindow *DW = (DisplayWindow *)Ptr;
 
-  while(!DW || !DW->DrawWinOpened) {
+  while(!DW || !DW->isWindowOpened()) {
     sleep(0.01);
   }
   Display *DisplayCur;
@@ -55,7 +55,7 @@ void *readVirtualMouseKbd(void *Ptr) {
   int32_t RootXp, RootYp, WinXp, WinYp;
   DisplayCur = XOpenDisplay(NULL);
   if (!DisplayCur) {
-    DW->Running = 0;
+    DW->stopRunning();
     printf("Error! Unable to open display!\n");
     exit(1);
   }
@@ -64,7 +64,7 @@ void *readVirtualMouseKbd(void *Ptr) {
   XKeyEvent *KEvent;
   Window WinFocus;
 //  XAllowEvents(DisplayCur, ReplayKeyboard, 0);
-  WinFocus = DW->DrawWin;
+  WinFocus = DW->getDrawWin();
 //  XGetInputFocus(DisplayCur, &WinFocus, &Revert);
   XGrabKeyboard(DisplayCur, WinFocus, false, GrabModeAsync, GrabModeAsync, 0);
 //  XSelectInput(DisplayCur, WinFocus, KeyPress|KeyRelease);
@@ -72,7 +72,7 @@ void *readVirtualMouseKbd(void *Ptr) {
   int64_t IoTime = 0;
   int32_t MouseRel = 0;
   int32_t SendGameMode = 0;
-  if (DW->Flags & GAME_MODE) {
+  if (DW->checkFlags(GAME_MODE)) {
     MouseRel = 1;
     SendGameMode = 1;
   }
@@ -82,7 +82,7 @@ void *readVirtualMouseKbd(void *Ptr) {
   XQueryPointer(DisplayCur, WinFocus, &Win, &Child,
                 &RootXp, &RootYp, &WinXp, &WinYp, &PrevMask);
 
-  while (DW->Running) {
+  while (DW->isRunning()) {
     uint64_t StartTime = Ml.getLocalTime();
     uint64_t StopTime;
     XQueryPointer(DisplayCur, WinFocus, &Win, &Child,
@@ -159,14 +159,20 @@ void *readVirtualMouseKbd(void *Ptr) {
         Ml.send(sizeof(XKeyEvent), (uint8_t *)KEvent);
         printf("End keyboard grab\n");
         XUngrabKeyboard(DisplayCur, CurrentTime);
-        XCloseDisplay(DisplayCur);
-        DW->Running = 0;
+        DW->stopRunning();
         Running = 0;
         break;
       }
       if (XKeysymToKeycode(DisplayCur, XK_Shift_L) == KEvent->keycode && (Mask & 256)) {
         printf("Mouse now is in window bounds\n");
-        MouseRel ^= 1;
+        MouseRel = 1;
+        Data[8 + 0] = 1;
+        Ml.send(7 + 8, (uint8_t *)Data);
+        KEvent->serial = XKeycodeToKeysym(DisplayCur, KEvent->keycode, 0);
+        Ml.send(sizeof(XKeyEvent), (uint8_t *)KEvent);
+      } else if (XKeysymToKeycode(DisplayCur, XK_Shift_R) == KEvent->keycode && (Mask & 256)) {
+        printf("Mouse now is out of window bounds\n");
+        MouseRel = 0;
         Data[8 + 0] = 1;
         Ml.send(7 + 8, (uint8_t *)Data);
         KEvent->serial = XKeycodeToKeysym(DisplayCur, KEvent->keycode, 0);
@@ -196,16 +202,15 @@ void *readVirtualMouseKbd(void *Ptr) {
     IoTime = (StopTime - StartTime);
     Io.add(IoTime);
   }
+  XCloseDisplay(DisplayCur);
   Io.print("Mouse read");
   return NULL;
 }
 
 void *testVirtualMouse(void *Ptr) {
-  DisplayWindow DWV;
-  DisplayWindow *DW = &DWV;
-  DW->createWindow(1024, 768, 0);
+  DisplayWindow *DW = (DisplayWindow *)Ptr;
 
-  while(!DW || !DW->DrawWinOpened) {
+  while(!DW || !DW->isWindowOpened()) {
     sleep(0.1);
   }
 
@@ -216,44 +221,35 @@ void *testVirtualMouse(void *Ptr) {
   int32_t RootXp, RootYp;
   DisplayCur = XOpenDisplay(NULL);
   if (!DisplayCur) {
-    DW->Running = 0;
+    DW->stopRunning();
     printf("Error! Unable to open display!\n");
     exit(1);
   }
 
   XEvent Event;
   XKeyEvent *KEvent;
-  Window WinFocus;
-//  XGetInputFocus(DisplayCur, &WinFocus, &Revert);
-//  XAllowEvents(DisplayCur, ReplayKeyboard, 0);
-  WinFocus = DW->DrawWin;
-  XGrabKeyboard(DisplayCur, WinFocus, false, GrabModeAsync, GrabModeAsync, 0);
+  Window WinFocus = DW->getDrawWin();
+  XGrabKeyboard(DisplayCur, WinFocus, false,
+                GrabModeAsync, GrabModeAsync, 0);
 
-  int16_t EscCnt = 0;
-  int32_t Running = DW->Running;
+  int32_t Running = DW->isRunning();
   XQueryPointer(DisplayCur, WinFocus, &Win, &Child,
                 &RootXp, &RootYp, &WinX, &WinY, &PrevMask);
 
   while (Running) {
     if (XCheckMaskEvent(DisplayCur, KeyPress, &Event)) {
       KEvent = (XKeyEvent *)&Event;
-      if (XKeysymToKeycode(DisplayCur, XK_Escape) == KEvent->keycode)
-        EscCnt = (EscCnt + 128) & 511;
+      if (XKeysymToKeycode(DisplayCur, XK_Escape) == KEvent->keycode) {
+        printf("End keyboard grab\n");
+        XUngrabKeyboard(DisplayCur, CurrentTime);
+        XCloseDisplay(DisplayCur);
+        DW->stopRunning();
+        Running = 0;
+        exit(1);
+      }
       if (XKeysymToKeycode(DisplayCur, XK_C) == KEvent->keycode) {
         DW->clearImage();
       }
-    }
-    if (EscCnt >= 128) {
-      printf("End keyboard grab\n");
-      XUngrabKeyboard(DisplayCur, CurrentTime);
-      XCloseDisplay(DisplayCur);
-      DW->Running = 0;
-      Running = 0;
-      exit(1);
-    }
-    if (EscCnt > 0) {
-      usleep(1);
-      EscCnt--;
     }
     XQueryPointer(DisplayCur, WinFocus, &Win, &Child,
                   &RootX, &RootY, &WinX, &WinY, &Mask);

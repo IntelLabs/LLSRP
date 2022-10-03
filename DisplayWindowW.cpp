@@ -19,17 +19,14 @@
  */
 
 #include <stdio.h>
-#include <unistd.h>
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <sys/shm.h>
-#include <X11/Xlib.h>
-#include <X11/extensions/XShm.h>
-#include <pthread.h>
-
 #include "Config.h"
-#include "DisplayWindow.h"
+#include "DisplayWindowW.h"
+
+SDL_Renderer *renderer;
+SDL_Texture *texture;
 
 DisplayWindow::DisplayWindow(DisplayWindow &DW) {
   printf("Copy is not allowed for DisplayWindow class, exiting\n");
@@ -41,101 +38,49 @@ DisplayWindow &DisplayWindow::operator=(const DisplayWindow &DW) {
   exit(1);
 }
 
-void *updateImage(void *Ptr) {
-  if (Ptr == NULL) {
+static DWORD WINAPI updateImage(LPVOID Arg) {
+  if (Arg == NULL) {
     printf("Error! Thread parameter is NULL!\n");
     return NULL;
   }
-  DisplayWindow *DW = (DisplayWindow *)Ptr;
-  Display *Display = XOpenDisplay(NULL);
-  if (Display == NULL) {
-    printf("Error! Can't open current X11 Display!\n");
-    return NULL;
-  }
-  if (!ScreenOfDisplay(Display, 0)) {
-    printf("Unable to get screen resolution for\n");
-    return NULL;
-  }
+  DisplayWindow *DW = (DisplayWindow *)Arg;
   int32_t Width = DW->getWidth();
   int32_t Height = DW->getHeight();
-  XImage *Image;
-  XShmSegmentInfo ShmInfo;
-  unsigned int *data;
-  // Create a shared memory area
-  ShmInfo.shmid = shmget(IPC_PRIVATE, Width * Height * 4, IPC_CREAT | 0606);
-  if (ShmInfo.shmid == -1)
-    return NULL;
+  uint32_t format = SDL_PIXELFORMAT_ARGB8888;
 
-  // Map the shared memory segment into the address space of this process
-  ShmInfo.shmaddr = (char *)shmat(ShmInfo.shmid, 0, 0);
-  if (ShmInfo.shmaddr == (char *)-1)
-    return NULL;
+  SDL_Init(SDL_INIT_VIDEO);
 
-  data = (unsigned int *)ShmInfo.shmaddr;
-  DW->setDataPtr((void *)ShmInfo.shmaddr);
-  ShmInfo.readOnly = false;
-
-  // Mark the shared memory segment for removal
-  // It will be removed even if this program crashes
-  shmctl(ShmInfo.shmid, IPC_RMID, 0);
-  Image = XShmCreateImage(Display, XDefaultVisual(Display, XDefaultScreen(Display)),
-                          DefaultDepth(Display, XDefaultScreen(Display)), ZPixmap, 0,
-                          &ShmInfo, 0, 0);
-  Image->width = Width;
-  Image->height = Height;
-  Image->data = (char *)data;
-
-  // Ask the X server to attach the shared memory segment and sync
-  XShmAttach(Display, &ShmInfo);
-  XSync(Display, false);
-  XSetWindowAttributes Attributes;
-  Attributes.backing_store = NotUseful;
-  Window WindowN = XCreateWindow(Display, DefaultRootWindow(Display),
-      0, 0, Width, Height, 0, DefaultDepth(Display, XDefaultScreen(Display)),
-      InputOutput, CopyFromParent, CWBackingStore, &Attributes);
-
-  XStoreName(Display, WindowN, "Display window");
-  XSelectInput(Display, WindowN, StructureNotifyMask);
-  XMapWindow(Display, WindowN);
-
-  // Get center coordinates for the window width, height
-  if (!ScreenOfDisplay(Display, 0)) {
-    printf("Unable to get screen resolution for\n");
-    return NULL;
-  }
-  int32_t StartX = (ScreenOfDisplay(Display, 0)->width - Width) / 2;
+  SDL_DisplayMode DM;
+  SDL_GetDesktopDisplayMode(0, &DM);
+  int32_t StartX = (DM.w - Width) / 2;
   StartX = StartX > 0 ? StartX : 0;
-  int32_t StartY = (ScreenOfDisplay(Display, 0)->height - Height) / 2;
+  int32_t StartY = (DM.h - Height) / 2;
   StartX = StartY > 0 ? StartY : 0;
   // Move window to the center if we are in game mode
-  if (DW->checkFlags(GAME_MODE))
-    XMoveWindow(Display, WindowN, StartX, StartY);
-  else
-    XMoveWindow(Display, WindowN, 0, 0);
+  if (!(DW->checkFlags(GAME_MODE)))
+    StartX = StartY = 0;
 
-  XGCValues Values;
-  Values.graphics_exposures = False;
-  GC Gc = XCreateGC(Display, WindowN, GCGraphicsExposures, &Values);
-
-  Atom DeleteAtom = XInternAtom(Display, "WM_DELETE_WINDOW", False);
-  XSetWMProtocols(Display, WindowN, &DeleteAtom, True);
-  DW->setDataPtr((void *)Image->data);
-  DW->setDrawWin(WindowN);
+  DW->setDrawWin(SDL_CreateWindow("Display Window" , StartX, StartY, Width, Height, 0));
   DW->setWindowOpened();
+
+  renderer = SDL_CreateRenderer(DW->getDrawWin(), -1, SDL_RENDERER_ACCELERATED);
+  texture = SDL_CreateTexture(renderer, format, SDL_TEXTUREACCESS_STREAMING, Width, Height);
+  DW->startRunning();
+  int32_t *Data = DW->getDataPtr();
   while (DW->isRunning()) {
-    XShmPutImage(Display, WindowN, Gc, Image,
-                 0, 0, 0, 0, Width, Height, False);
-    XSync(Display, False);
-    usleep(10);
+    SDL_PumpEvents();
+    SDL_UpdateTexture(texture, NULL, Data, Width * sizeof(*Data));
+    SDL_RenderCopy(renderer, texture, NULL, NULL);
+    SDL_RenderPresent(renderer);
+    Sleep(10);
   }
-  sleep(1);
-  XDestroyWindow(Display, WindowN);
-  XCloseDisplay(Display);
   return NULL;
 }
 
 DisplayWindow::~DisplayWindow() {
-  pthread_cancel(DisplayThread);
+  if (BufData)
+    delete [] BufData;
+  TerminateThread(DisplayThread, 0);
 }
 
 bool DisplayWindow::isWindowOpened() {
@@ -162,20 +107,24 @@ void DisplayWindow::stopRunning() {
   Running = 0;
 }
 
-void DisplayWindow::setDrawWin(Window &DrawWindow) {
+void DisplayWindow::setDrawWin(SDL_Window *DrawWindow) {
   DrawWin = DrawWindow;
 }
 
-Window &DisplayWindow::getDrawWin() {
+SDL_Window *DisplayWindow::getDrawWin() {
   return DrawWin;
 }
 
-
 bool DisplayWindow::createWindow(int32_t Width, int32_t Height, int32_t DWFlags) {
+  DWORD dwThreadIdArray;
   BufHeight = Height;
   BufWidth = Width;
   Flags = DWFlags;
-  pthread_create(&DisplayThread, NULL, &updateImage, this);
+  BufData = new int32_t[4 * BufHeight * BufWidth + 16];
+  if (BufData == NULL)
+    return false;
+  clearImage();
+  DisplayThread = CreateThread(NULL, 0, updateImage, this, 0, &dwThreadIdArray);
   return true;
 }
 
@@ -191,7 +140,7 @@ void DisplayWindow::clearImage() {
 }
 void DisplayWindow::drawCursor(int32_t X, int32_t Y, int32_t Color) {
   uint8_t *RGB = (uint8_t *)BufData;
-  const int32_t w = 2;
+  const int32_t w = 0;
   for (int x = -w; x < w + 1; x++)
     for (int y = -w; y < w + 1; y++) {
       int32_t cur = 4 * ((Y + y) * BufWidth + (X + x));
@@ -232,10 +181,8 @@ DisplayWindow::DisplayWindow() {
   BufHeight = 0;
   BufData = NULL;
   DrawWinOpened = false;
-  DrawWin = (Window)-1;
   Running = true;
 }
-
 
 //inline
 int32_t DisplayWindow::getWidth() {

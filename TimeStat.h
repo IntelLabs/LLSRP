@@ -40,15 +40,16 @@ public:
     }
     printf("%s in ms (min, avg, max): %ld %ld %ld\n",
            Name,
-           (int64_t)(Min / 1000),
-           (int64_t)(Avg / Cnt / 1000),
-           (int64_t)(Max / 1000));
+           (long int)(Min / 1000),
+           (long int)(Avg / Cnt / 1000),
+           (long int)(Max / 1000));
   }
   inline
   void add(int64_t TimeDiff) {
     if (TimeDiff <= 0) {
       if (TimeDiff < 0)
-        printf("Warning! Time difference %ld is < 0!\n", TimeDiff);
+        printf("Warning! Time difference %ld is < 0!\n",
+               (long int)TimeDiff);
       return;
     }
     Cnt++;

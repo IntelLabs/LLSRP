@@ -191,13 +191,11 @@ void *emulateVirtualMouseKbd(void *Ptr) {
           return NULL;
         }
         if (XK_Shift_L == KEvent->serial && (BMask & 1)) {
-          if (SyncMouse) {
-            printf("Mouse is relative now...\n");
-            SyncMouse = false;
-          } else {
-            printf("Mouse is synced now...\n");
-            SyncMouse = true;
-          }
+          printf("Mouse is relative now...\n");
+          SyncMouse = false;
+        } else if (XK_Shift_R == KEvent->serial && (BMask & 1)) {
+          printf("Mouse is synced now...\n");
+          SyncMouse = true;
         }
         if (KEvent->type == KeyPress) {
           XTestFakeKeyEvent(DisplayCur, KEvent->keycode, true, 0);

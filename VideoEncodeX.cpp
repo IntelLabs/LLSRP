@@ -23,6 +23,17 @@
 #include <stdint.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <stdlib.h>
+
+VideoEncodeX::VideoEncodeX(VideoEncodeX &VE) {
+  printf("Copy is not allowed for VideoEncodeX class, exiting\n");
+  exit(1);
+}
+
+VideoEncodeX &VideoEncodeX::operator=(VideoEncodeX &VE) {
+  printf("operator= is not allowed for VideoEncodeX class, exiting\n");
+  exit(1);
+}
 
 VideoEncodeX::VideoEncodeX() {}
 VideoEncodeX::~VideoEncodeX() {

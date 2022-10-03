@@ -21,18 +21,14 @@
 #include "multilink.h"
 
 #include <stdio.h>
-#include <unistd.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <fcntl.h>
 
 #include "Config.h"
-#include "Options.h"
-#include "VideoDecode.h"
-#include "DisplayWindow.h"
-#include "MouseKbdRead.h"
-#include "MemoryBuffer.h"
+#include "VideoDecodeW.h"
+#include "DisplayWindowW.h"
+#include "MemoryBufferW.h"
 #include "TimeStat.h"
+#include "MouseKbdReadW.h"
+#include "OptionsW.h"
 
 MultiLink Ml;
 bool WindowOpened = false;
@@ -40,7 +36,6 @@ int32_t Running = 1;
 int32_t AvgRT;
 
 uint64_t GlobalTime;
-
 
 class DecodeSlice {
 public:
@@ -68,22 +63,22 @@ public:
 
 MemoryBuffer Mb(SLICE_NUM * 4 + 1);
 
-void *decodeSlice(void *Ptr) {
-  if (Ptr == NULL) {
+DWORD WINAPI decodeOneSlice(LPVOID Arg) {
+  if (Arg == NULL) {
     printf("Error! Wrong decode slice thread parameter!\n");
     return NULL;
   }
-  DecodeSlice *DS = (DecodeSlice *)Ptr;
+  DecodeSlice *DS = (DecodeSlice *)Arg;
   int32_t FrameNum = -1;
   while (Running) {
     int16_t SPtr;
     uint8_t *SlicePtr = Mb.getSlicePtr(DS->Num, &FrameNum, &SPtr);
     if (!SlicePtr) {
-      sleep(0.001);
+      Sleep(1);
       continue;
     }
-    DS->Ret = DS->V->decodeFrame(DS->OutData, Mb.getSliceSize(SPtr), SlicePtr,
-                                 DS->Num, DS->WindowOpened);
+    DS->Ret = DS->V->decodeFrame(DS->OutData, Mb.getSliceSize(SPtr),
+                                 SlicePtr, DS->Num, DS->WindowOpened);
     if (FrameNum != -1)
       FrameNum = (FrameNum + 1) & 255;
 #ifdef PRINT_WARN
@@ -95,12 +90,11 @@ void *decodeSlice(void *Ptr) {
   return NULL;
 }
 
-int main(int argc, char *argv[]) {
+int wmain(int argc, wchar_t *argv[]) {
   uint32_t Cntr = 0;
-  pthread_t ReadMouseThread;
-  pthread_t DecodeThread[SLICE_NUM];
-  const char **Args;
-  poptContext optCon;
+  HANDLE ReadMouseThread = NULL;
+  HANDLE DecodeThread[SLICE_NUM];
+  char **Args = NULL;
   int32_t LNum = 1;
   int32_t RNum = 1;
   int32_t LPort = 3000;
@@ -110,22 +104,26 @@ int main(int argc, char *argv[]) {
   int32_t GameMode = 0;
   int32_t Iterations = 1000000;
 
-  avcodec_register_all();
+  DWORD dwThreadIdArray;
   DisplayWindow DW;
-
 #ifdef MOUSE_TEST
   DW.createWindow(1024, 768, 0);
-  sleep(1);
-  pthread_create(&ReadMouseThread, NULL, testVirtualMouse, &DW);
-  while (DW.isRunning() && Cntr < 500) {
+  Running = 1;
+  ReadMouseThread = CreateThread(NULL, 0, testVirtualMouse, &DW, 0, &dwThreadIdArray);
+  while (Running && Cntr < 500) {
     // running test for not more than 500 sec
-    sleep(1);
+    Sleep(1000);
     Cntr++;
+    Running = DW.isRunning();
   }
-  pthread_cancel(ReadMouseThread);
+  if (ReadMouseThread)
+    TerminateThread(ReadMouseThread, 0);
   return 0;
-#endif /* MOUSE_TEST */
-  Args = parseClientOpts(&optCon, argc, argv, &LNum, &RNum, &LPort, &RPort,
+#else
+  avcodec_register_all();
+  Ml.setCommDeviceNumber(LNum, RNum);
+  int ArgsSize = 0;
+  Args = parseClientOpts(&ArgsSize, argc, argv, &LNum, &RNum, &LPort, &RPort,
                          &Nom, &Denom, &GameMode, &Iterations);
   if (!Args) {
     printf("Error reading options!\n");
@@ -134,10 +132,22 @@ int main(int argc, char *argv[]) {
 
   printf("Setting up %d local and %d remote:\n", LNum, RNum);
   Ml.setCommDeviceNumber(LNum, RNum);
+  if (LNum < 0 || LNum > 32 || RNum < 0 || RNum > 32) {
+    printf("Error! Unsupported number of local or remote links defined by -l, -r\n");
+    printf("Should be between 0 and 32.\n");
+    delete [] Args;
+    return -1;
+  }
+  if (Iterations < 0 || Iterations > 1 << 30) {
+    printf("Error! Unsupported number of iterations defined by -I\n");
+    printf("Should be between 0 and 2^30.\n");
+    delete [] Args;
+    return -1;
+  }
   for (int i = 0; i < LNum; i++) {
     char *IfaceName;
     int32_t Port;
-    if (Args[i] == NULL) {
+    if (Args[i] == NULL || i >= ArgsSize) {
       printf("Warning: local name is missing, set only %d local devices!\n", i);
       break;
     }
@@ -157,7 +167,7 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < RNum; i++) {
     char *IfaceName;
     int32_t Port;
-    if (Args[LNum + i] == NULL) {
+    if (Args[LNum + i] == NULL || LNum + i >= ArgsSize) {
       printf("Warning: local name is missing, set only %d remote addrs!\n", i);
       break;
     }
@@ -177,9 +187,9 @@ int main(int argc, char *argv[]) {
   printf("Setting redundancy info(%d), redundancy(%d)\n", Nom, Denom);
   Ml.setRedundancy(Denom, Nom);
   Ml.initiateLinks();
-//  setuid(1002);
+#endif /* MOUSE_TEST */
 
-  sleep(1);
+  Sleep(1000);
   VideoDecode *V = new VideoDecode[SLICE_NUM];
 
   int32_t DInit = 0;
@@ -203,7 +213,7 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < SLICE_NUM; i++) {
     DS[i].V = &V[i];
     DS[i].Num = i;
-    pthread_create(&DecodeThread[i], NULL, decodeSlice, &DS[i]);
+    DecodeThread[i] = CreateThread(NULL, 0, decodeOneSlice, &DS[i], 0, &dwThreadIdArray);
   }
   // Main loop
   while (Cntr < Iterations && Running) {
@@ -251,12 +261,12 @@ int main(int argc, char *argv[]) {
       DW.createWindow(V[0].getCtxWidth() * SLICE_NUM_X,
                       V[0].getCtxHeight() * SLICE_NUM_Y, Flags);
       // let sometime to create a window
-      sleep(1);
+      Sleep(1000);
       for (int i = 0; i < SLICE_NUM; i++) {
         DS[i].OutData = DW.getSlicePtr(i);
         DS[i].WindowOpened = true;
       }
-      pthread_create(&ReadMouseThread, NULL, readVirtualMouseKbd, &DW);
+      ReadMouseThread = CreateThread(NULL, 0, readVirtualMouseKbd, &DW, 0, &dwThreadIdArray);
       WindowOpened = true;
     }
     Cntr++;
@@ -266,16 +276,17 @@ int main(int argc, char *argv[]) {
 #endif
   Ml.printLinksInfo();
   Running = 0;
-  sleep(1);
   DW.stopRunning();
+  Sleep(1000);
   delete[] FrameNum;
   delete[] V;
-  if (WindowOpened)
-    pthread_cancel(ReadMouseThread);
+  if (ReadMouseThread)
+    TerminateThread(ReadMouseThread, 0);
 
   for (int i = 0; i < SLICE_NUM; i++) {
-    pthread_cancel(DecodeThread[i]);
+    if (DecodeThread[i])
+      TerminateThread(DecodeThread[i], 0);
   }
-  poptFreeContext(optCon);
+  delete [] Args;
   return 0;
 }

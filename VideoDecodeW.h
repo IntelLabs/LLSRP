@@ -18,41 +18,37 @@
  *             e-mail: evgeny.v.stupachenko@intel.com
  */
 
-#ifndef VIDEOENCODEX_H
-#define VIDEOENCODEX_H
+#ifndef VIDEODECODE_H
+#define VIDEODECODE_H
 
-#include <stdint.h>
+//#include <stdint.h>
 
 extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavdevice/avdevice.h>
 #include <libavformat/avformat.h>
 #include <libavutil/imgutils.h>
-#include <x264.h>
+#include <libavutil/opt.h>
 };
 
-class VideoEncodeX {
+class VideoDecode {
 private:
-  x264_picture_t XFrame;
-  x264_t *Encoder;
-  x264_param_t Ctx;
-  x264_picture_t XPkt;
   AVFrame *Frame;
-  uint8_t *Buf;
-  int32_t TargetRate;
-  int32_t AvgRate;
-  uint16_t Slice;
-  uint16_t Id;
-  int64_t EncodeTime;
-  int64_t EncodeFrame;
-  VideoEncodeX(VideoEncodeX &VE);
-  VideoEncodeX &operator=(VideoEncodeX &VE);
+  AVCodec *Codec;
+  AVCodecContext *CodecCtx;
+  AVDictionary *Options;
+  AVPacket Pkt;
+  int64_t DecodeTime;
+  int64_t DecodeFrame;
+
 public:
-  VideoEncodeX();
-  ~VideoEncodeX();
-  int32_t init(int32_t Width, int32_t Height, int32_t FPS, int32_t SliceNum);
-  void initPkt();
-  void unrefPkt();
-  AVFrame *getFramePtr();
-  int32_t encodeFrame(int32_t FrameNum, int32_t *PktSize,
-                      uint8_t **PktData, int32_t Quality);
+  VideoDecode();
+  ~VideoDecode();
+  int32_t init(int32_t SliceNum);
+  int32_t getCtxWidth();
+  int32_t getCtxHeight();
+  // Decode one Pkt to BGRA Frame.  Write result to OutputFrame.
+  int32_t decodeFrame(uint8_t *OutputData, int32_t PktSize,
+                      uint8_t *PktData, int32_t Num, bool WriteData = true);
 };
-#endif /* VIDEOENCODEX_H */
+#endif /* VIDEODECODE_H */
