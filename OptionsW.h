@@ -132,7 +132,7 @@ char **parseClientOpts(int32_t *ArgSize, int argc, wchar_t *argW[],
     }
     ArgsC[j] = new char[strlen(argv) + 1];
     strncpy(ArgsC[j], argv, strlen(argv));
-    ArgsC[strlen(argv)] = '\0';
+    ArgsC[j][strlen(argv)] = '\0';
     j++;
     delete [] argv;
   }
