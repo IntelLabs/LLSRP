@@ -89,7 +89,7 @@ void *decodeSlice(void *Ptr) {
 #ifdef PRINT_WARN
     if (DS->Ret != 0)
       printf("Warning: unable to decode received packet size %d, slice %d "
-             "maybe missing, error %d\n", Mb.SInfo[SPtr].Size, DS->Num, DS->Ret);
+             "maybe missing, error %d\n", Mb.getSliceSize(SPtr), DS->Num, DS->Ret);
 #endif
   }
   return NULL;
@@ -108,6 +108,7 @@ int main(int argc, char *argv[]) {
   int32_t Nom = 1;
   int32_t Denom = 1;
   int32_t GameMode = 0;
+  int32_t FlipWait = 0;
   int32_t Iterations = 1000000;
 
   avcodec_register_all();
@@ -126,12 +127,12 @@ int main(int argc, char *argv[]) {
   return 0;
 #endif /* MOUSE_TEST */
   Args = parseClientOpts(&optCon, argc, argv, &LNum, &RNum, &LPort, &RPort,
-                         &Nom, &Denom, &GameMode, &Iterations);
+                         &Nom, &Denom, &GameMode, &FlipWait, &Iterations);
   if (!Args) {
     printf("Error reading options!\n");
     return -1;
   }
-
+  Mb.setFlipWait(FlipWait);
   printf("Setting up %d local and %d remote:\n", LNum, RNum);
   Ml.setCommDeviceNumber(LNum, RNum);
   for (int i = 0; i < LNum; i++) {

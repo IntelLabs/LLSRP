@@ -47,6 +47,8 @@ void printHelp() {
   printf("-d    Error correction redundancy bits denominator\n");
   printf("-g    Enable game mode (center window, keep mouse in window,\n"
          "        use relative mouse coordinates\n");
+  printf("-f    Enable wait for flipped frame (when N+1 comes prior to N).\n"
+         "        When disabled (default) drops the frame.\n");
   printf("-I    Number of frames to receive, exits after\n");
 }
 
@@ -54,7 +56,8 @@ char **parseClientOpts(int32_t *ArgSize, int argc, wchar_t *argW[],
                        int32_t *LNum, int32_t *RNum,
                        int32_t *LPort, int32_t *RPort,
                        int32_t *Nom, int32_t *Denom,
-                       int32_t *GameMode, int32_t *Iterations) {
+                       int32_t *GameMode, int32_t *FlipWait,
+                       int32_t *Iterations) {
 
   char **ArgsC;
 
@@ -63,7 +66,7 @@ char **parseClientOpts(int32_t *ArgSize, int argc, wchar_t *argW[],
     exit(1);
   }
   *GameMode = 0;
-
+  *FlipWait = 0;
   for (int i = 1; i < argc; i++) {
     int len = wcslen(argW[i]);
     char *argv = new char[len + 1];
@@ -75,6 +78,8 @@ char **parseClientOpts(int32_t *ArgSize, int argc, wchar_t *argW[],
       return 0;
     } else if (strcmp(argv, "-g") == 0) {
       *GameMode = 1;
+    } else if (strcmp(argv, "-f") == 0) {
+      *FlipWait = 1;
     } else if (argv[0] == '-') {
       if (i == argc - 1) {
         printf("The option %s should have argument (see --help)\n", argv);

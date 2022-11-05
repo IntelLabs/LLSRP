@@ -50,7 +50,8 @@ const char **parseClientOpts(poptContext *optCon, int argc, char *argv[],
                              int32_t *LNum, int32_t *RNum,
                              int32_t *LPort, int32_t *RPort,
                              int32_t *Nom, int32_t *Denom,
-                             int32_t *GameMode, int32_t *Iterations) {
+                             int32_t *GameMode, int32_t *FlipWait,
+                             int32_t *Iterations) {
 
   int c;
   int i = 0;
@@ -73,6 +74,9 @@ const char **parseClientOpts(poptContext *optCon, int argc, char *argv[],
      { "game", 'g', 0, 0, 'g',
          "Enable game mode (center window, keep mouse in window,"
          " use relative mouse coordinates", NULL },
+     { "flipwait", 'f', 0, 0, 'f',
+         "Enable wait for flipped frame (when N+1 comes prior to N)."
+         " When disabled (default) drops the frame.", NULL },
      { "I", 'I', POPT_ARG_INT, Iterations, 0,
          "Number of frames to receive", NULL},
      POPT_AUTOHELP
@@ -87,6 +91,7 @@ const char **parseClientOpts(poptContext *optCon, int argc, char *argv[],
     exit(1);
   }
   *GameMode = 0;
+  *FlipWait = 0;
   /* Now do options processing */
   while ((c = poptGetNextOpt(*optCon)) >= 0) {
     switch (c) {
@@ -114,6 +119,10 @@ const char **parseClientOpts(poptContext *optCon, int argc, char *argv[],
       case 'g':
         Buf[i++] = 'g';
         *GameMode = 1;
+        break;
+      case 'f':
+        Buf[i++] = 'f';
+        *FlipWait = 1;
         break;
     }
   }

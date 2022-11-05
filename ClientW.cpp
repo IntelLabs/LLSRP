@@ -84,7 +84,7 @@ DWORD WINAPI decodeOneSlice(LPVOID Arg) {
 #ifdef PRINT_WARN
     if (DS->Ret != 0)
       printf("Warning: unable to decode received packet size %d, slice %d "
-             "maybe missing, error %d\n", Mb.SInfo[SPtr].Size, DS->Num, DS->Ret);
+             "maybe missing, error %d\n", Mb.getSliceSize(SPtr), DS->Num, DS->Ret);
 #endif
   }
   return NULL;
@@ -102,6 +102,7 @@ int wmain(int argc, wchar_t *argv[]) {
   int32_t Nom = 1;
   int32_t Denom = 1;
   int32_t GameMode = 0;
+  int32_t FlipWait = 0;
   int32_t Iterations = 1000000;
 
   DWORD dwThreadIdArray;
@@ -124,12 +125,12 @@ int wmain(int argc, wchar_t *argv[]) {
   Ml.setCommDeviceNumber(LNum, RNum);
   int ArgsSize = 0;
   Args = parseClientOpts(&ArgsSize, argc, argv, &LNum, &RNum, &LPort, &RPort,
-                         &Nom, &Denom, &GameMode, &Iterations);
+                         &Nom, &Denom, &GameMode, &FlipWait, &Iterations);
   if (!Args) {
     printf("Error reading options!\n");
     return -1;
   }
-
+  Mb.setFlipWait(FlipWait);
   printf("Setting up %d local and %d remote:\n", LNum, RNum);
   Ml.setCommDeviceNumber(LNum, RNum);
   if (LNum < 0 || LNum > 32 || RNum < 0 || RNum > 32) {

@@ -261,6 +261,8 @@ int main(int argc, char *argv[]) {
   Running = 0;
   sleep(1);
   pthread_cancel(MouseThread);
+  uint8_t Quit[5] = {'Q', 'u', 'i', 't', '\0'};
+  Ml.send(5, Quit);
   Ml.printLinksInfo();
   poptFreeContext(optCon);
   delete [] V;
