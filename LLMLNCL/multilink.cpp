@@ -618,7 +618,7 @@ void MultiLink::runSockets(uint16_t LocalSocketIdx) {
       // this is the link id as remote sees it
       ui16value = *((uint16_t *)&UdpBuffer[LocalSocketIdx][2]);
       // this is the rate in Kb/s
-      if (RemoteIdx < RemoteCommDeviceNumber) {
+      if (RemoteIdx < TotalLinkNumber) {
         for (i = 0; i < TotalLinkNumber; i++) {
           // we need to find a link with remote index ID == i
           if (Link[i].RemoteLinkIdx == RemoteIdx) { // found it!
@@ -831,10 +831,12 @@ void MultiLink::runMeasurements(uint16_t LinkIdx) {
     // Rate Control section
     if (Link[LinkIdx].ProbationModeCounter > 0) {
       // In Probation mode
-      if (Link[LinkIdx].RxRateStatistics[0] < MinLinkTXRate) {
+      if (Link[LinkIdx].RxRateStatistics[0] < MinLinkTXRate / 1024) {
           Link[LinkIdx].ProbationModeCounter = 0;
+          Link[LinkIdx].TxDesiredRate = Link[LinkIdx].TxRateBeforeProbation;
 #ifdef DEBUG_PRINT
-          printf("Probation is skipped%d\n");
+          printf("Probation is skipped as statistic is small %g\n",
+                 Link[LinkIdx].RxRateStatistics[0]);
 #endif
           continue;
       }
@@ -977,9 +979,9 @@ void MultiLink::runMeasurements(uint16_t LinkIdx) {
               (uint64_t)(1.2 * Link[LinkIdx].TxDesiredRate);
           if (Link[LinkIdx].TxDesiredRate < MinLinkTXRate) {
               Link[LinkIdx].TxDesiredRate = MinLinkTXRate;
-         } else if (Link[LinkIdx].TxDesiredRate > MaxLinkTXRate) {
-             Link[LinkIdx].TxDesiredRate = MaxLinkTXRate;
-         }
+          } else if (Link[LinkIdx].TxDesiredRate > MaxLinkTXRate) {
+              Link[LinkIdx].TxDesiredRate = MaxLinkTXRate;
+          }
 
 #ifdef DEBUG_PRINT
           printf("link %u, probation starts to %lu\n", LinkIdx,
