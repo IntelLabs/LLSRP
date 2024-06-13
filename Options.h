@@ -28,6 +28,7 @@ int32_t splitNamePort(const char *In, int32_t Len, char *Out, int32_t &Port) {
   char *PortChar;
   for (i = 0; i < Len; i++)
     Out[i] = In[i];
+  Out[Len] = '\0';
   for (i = 0; i < Len; i++)
     if (In[i] == ':')
       break;

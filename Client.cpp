@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
     }
     // if port specified "lo:3000"
     int32_t Len = strlen(Args[i]);
-    IfaceName = new char[Len];
+    IfaceName = new char[Len + 1];
     if (splitNamePort(Args[i], Len, IfaceName, Port)) {
       printf("Local %s, port %d\n", IfaceName, Port);
       Ml.addLocalIfaceAndPort(IfaceName, Port);
@@ -164,7 +164,7 @@ int main(int argc, char *argv[]) {
     }
     // if port specified "127.0.0.1:3000"
     int32_t Len = strlen(Args[LNum + i]);
-    IfaceName = new char[Len];
+    IfaceName = new char[Len + 1];
     if (splitNamePort(Args[LNum + i], Len, IfaceName, Port)) {
       printf("Remote %s, port %d\n", IfaceName, Port);
       Ml.addRemoteAddrAndPort(IfaceName, Port);
