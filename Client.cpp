@@ -16,7 +16,10 @@
 /*
  * Written by: Evgeny Stupachenko
  *             e-mail: evgeny.v.stupachenko@intel.com
- */
+ *             Andrey Belogolovy
+ *             e-mail: andrey.belogolovy@intel.com
+ *                     a.v.belogolovy@gmail.com
+*/
 
 #include "multilink.h"
 

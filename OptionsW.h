@@ -16,6 +16,9 @@
 /*
  * Written by: Evgeny Stupachenko
  *             e-mail: evgeny.v.stupachenko@intel.com
+ *             Andrey Belogolovy
+ *             e-mail: andrey.belogolovy@intel.com
+ *                     a.v.belogolovy@gmail.com
  */
 int32_t splitNamePort(const char *In, int32_t Len, char *Out, int32_t &Port) {
   int32_t i;

@@ -16,6 +16,7 @@
 /*
  * Written by: Andrey Belogolovy
  *             e-mail: andrey.belogolovy@intel.com
+ *                     a.v.belogolovy@gmail.com
  */
 
 #include "multilink.h"
